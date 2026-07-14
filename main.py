@@ -5,6 +5,7 @@ from src.mindos import MindOS
 from src.prompt.prompt_builder import PromptBuilder
 from src.rag.indexer import Indexer
 from src.rag.in_memory_vector_store import InMemoryVectorStore
+from src.rag.knowledge_cache import KnowledgeCache
 from src.rag.markdown_loader import MarkdownLoader
 from src.rag.paragraph_splitter import ParagraphSplitter
 from src.rag.retriever import Retriever
@@ -19,11 +20,17 @@ def build_mindos() -> MindOS:
     embedding = SiliconFlowEmbedding()
     vector_store = InMemoryVectorStore()
 
+    cache = KnowledgeCache(
+        cache_path="data/knowledge_index.json",
+        cache_key=Settings.EMBEDDING_MODEL,
+    )
+
     indexer = Indexer(
         loader=loader,
         splitter=splitter,
         embedding=embedding,
         vector_store=vector_store,
+        cache=cache,
     )
 
     indexed_count = indexer.index_directory("knowledge")

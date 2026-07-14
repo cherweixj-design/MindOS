@@ -1,9 +1,11 @@
 from pathlib import Path
+from typing import List, Optional, Tuple
 
 from .base_embedding import BaseEmbedding
 from .base_loader import BaseLoader
 from .base_splitter import BaseSplitter
 from .base_vector_store import BaseVectorStore
+from .knowledge_cache import KnowledgeCache
 
 
 class Indexer:
@@ -15,11 +17,13 @@ class Indexer:
         splitter: BaseSplitter,
         embedding: BaseEmbedding,
         vector_store: BaseVectorStore,
+        cache: Optional[KnowledgeCache] = None,
     ):
         self.loader = loader
         self.splitter = splitter
         self.embedding = embedding
         self.vector_store = vector_store
+        self.cache = cache
 
     def index(self, file_path: str) -> None:
         """Load, split, embed, and store a document."""
@@ -31,7 +35,8 @@ class Indexer:
     def index_directory(self, directory_path: str) -> int:
         """Index all non-empty Markdown files in a directory.
 
-        Returns the number of files that were successfully indexed.
+        Uses cache when available. Returns the number of files
+        that were successfully indexed.
         """
         path = Path(directory_path)
 
@@ -45,24 +50,61 @@ class Indexer:
                 f"Not a directory: {directory_path}"
             )
 
+        if self.cache is not None:
+            cached = self.cache.load_if_valid(directory_path)
+            if cached is not None:
+                self.vector_store.add(
+                    texts=cached.texts,
+                    vectors=cached.vectors,
+                    sources=cached.sources,
+                )
+                return cached.indexed_file_count
+
         md_files = sorted(path.glob("*.md"))
 
+        all_texts: List[str] = []
+        all_vectors: List[List[float]] = []
+        all_sources: List[str] = []
         count = 0
+
         for md_file in md_files:
-            if self._index_file(md_file):
+            result = self._prepare_file_index(md_file)
+            if result is not None:
+                texts, vectors, sources = result
+                self.vector_store.add(
+                    texts=texts,
+                    vectors=vectors,
+                    sources=sources,
+                )
+                all_texts.extend(texts)
+                all_vectors.extend(vectors)
+                all_sources.extend(sources)
                 count += 1
+
+        if self.cache is not None:
+            self.cache.save(
+                indexed_file_count=count,
+                texts=all_texts,
+                vectors=all_vectors,
+                sources=all_sources,
+                fingerprint=self.cache.compute_fingerprint(directory_path),
+            )
 
         return count
 
-    def _index_file(self, file_path: Path) -> bool:
-        """Index a single file if it has non-empty content.
+    def _prepare_file_index(
+        self,
+        file_path: Path,
+    ) -> Optional[Tuple[List[str], List[List[float]], List[str]]]:
+        """Load, split, and embed a single file.
 
-        Returns True if content was indexed, False if the file was empty.
+        Returns (texts, vectors, sources) or None if file is empty.
+        Raises ValueError on data integrity issues.
         """
         text = self.loader.load(str(file_path))
 
         if not text.strip():
-            return False
+            return None
 
         chunks = self.splitter.split(text)
 
@@ -80,8 +122,22 @@ class Indexer:
 
         sources = [file_path.name] * len(chunks)
 
+        return chunks, vectors, sources
+
+    def _index_file(self, file_path: Path) -> bool:
+        """Index a single file if it has non-empty content.
+
+        Returns True if content was indexed, False if the file was empty.
+        """
+        result = self._prepare_file_index(file_path)
+
+        if result is None:
+            return False
+
+        texts, vectors, sources = result
+
         self.vector_store.add(
-            texts=chunks,
+            texts=texts,
             vectors=vectors,
             sources=sources,
         )
