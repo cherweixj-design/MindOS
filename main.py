@@ -26,7 +26,10 @@ def build_mindos() -> MindOS:
         vector_store=vector_store,
     )
 
-    indexer.index("knowledge/employee.md")
+    indexed_count = indexer.index_directory("knowledge")
+
+    if Settings.DEBUG:
+        print(f"[DEBUG] 已索引 Markdown 文件数量：{indexed_count}")
 
     retriever = Retriever(
         embedding=embedding,
