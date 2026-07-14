@@ -78,8 +78,11 @@ class Indexer:
                 "The number of chunks and vectors does not match."
             )
 
+        sources = [file_path.name] * len(chunks)
+
         self.vector_store.add(
             texts=chunks,
             vectors=vectors,
+            sources=sources,
         )
         return True

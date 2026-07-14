@@ -1,4 +1,6 @@
-from typing import List, Tuple
+from typing import List
+
+from .retrieval_result import RetrievalResult
 
 
 class BaseRetriever:
@@ -8,6 +10,6 @@ class BaseRetriever:
         self,
         question: str,
         top_k: int = 3,
-    ) -> List[Tuple[str, float]]:
-        """Return relevant chunks and similarity scores."""
+    ) -> List[RetrievalResult]:
+        """Return relevant results with text, score, and source."""
         raise NotImplementedError

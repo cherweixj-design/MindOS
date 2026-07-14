@@ -1,9 +1,10 @@
-from typing import List, Tuple
+from typing import List
 
 from src.llm.base import BaseLLM
 from src.memory.memory import Memory
 from src.prompt.prompt_builder import PromptBuilder
 from src.rag.base_retriever import BaseRetriever
+from src.rag.retrieval_result import RetrievalResult
 
 
 class MindOS:
@@ -28,22 +29,22 @@ class MindOS:
     def chat(self, question: str) -> str:
         """Answer a user question with retrieved knowledge."""
 
-        # 1. 检索知识及其相似度分数
+        # 1. 检索知识
         retrieval_results = self.retriever.search(
             question=question,
             top_k=self.top_k,
         )
 
-        # 2. Debug 模式下显示文本和相似度
+        # 2. Debug 模式下显示文本、相似度和来源
         if self.debug:
             self._show_retrieval_results(
                 retrieval_results
             )
 
-        # 3. PromptBuilder 只需要文本，不需要分数
+        # 3. 提取知识文本給 PromptBuilder
         knowledge = [
-            text
-            for text, score in retrieval_results
+            result.text
+            for result in retrieval_results
         ]
 
         # 4. 组合提示词、知识、历史和当前问题
@@ -56,7 +57,15 @@ class MindOS:
         # 5. 调用大模型
         answer = self.llm.chat(messages)
 
-        # 6. 保存当前会话历史
+        # 6. 有检索结果时追加真实来源（去重、保持首次出现顺序）
+        if retrieval_results:
+            seen_sources: List[str] = []
+            for result in retrieval_results:
+                if result.source not in seen_sources:
+                    seen_sources.append(result.source)
+            answer += f"\n\n来源：{'、'.join(seen_sources)}"
+
+        # 7. 保存当前会话历史
         self.memory.add("user", question)
         self.memory.add("assistant", answer)
 
@@ -64,9 +73,9 @@ class MindOS:
 
     def _show_retrieval_results(
         self,
-        results: List[Tuple[str, float]],
+        results: List[RetrievalResult],
     ) -> None:
-        """Print retrieved knowledge and similarity scores."""
+        """Print retrieved knowledge, similarity scores and sources."""
 
         print("\n[DEBUG] Retriever 检索结果：")
 
@@ -74,12 +83,13 @@ class MindOS:
             print("没有达到相似度要求的知识。")
             return
 
-        for index, (text, score) in enumerate(
+        for index, result in enumerate(
             results,
             start=1,
         ):
             print(
                 f"\n--- Chunk {index} "
-                f"| Score: {score:.4f} ---"
+                f"| Score: {result.score:.4f} "
+                f"| Source: {result.source} ---"
             )
-            print(text)
+            print(result.text)

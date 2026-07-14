@@ -1,8 +1,9 @@
-from typing import List, Tuple
+from typing import List
 
 from .base_embedding import BaseEmbedding
 from .base_retriever import BaseRetriever
 from .base_vector_store import BaseVectorStore
+from .retrieval_result import RetrievalResult
 
 
 class Retriever(BaseRetriever):
@@ -22,7 +23,7 @@ class Retriever(BaseRetriever):
         self,
         question: str,
         top_k: int = 3,
-    ) -> List[Tuple[str, float]]:
+    ) -> List[RetrievalResult]:
         """Embed a question and retrieve relevant knowledge."""
 
         query_vector = self.embedding.embed(
@@ -35,7 +36,7 @@ class Retriever(BaseRetriever):
         )
 
         return [
-            (text, score)
-            for text, score in results
-            if score >= self.min_score
+            result
+            for result in results
+            if result.score >= self.min_score
         ]

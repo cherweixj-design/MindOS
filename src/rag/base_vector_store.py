@@ -1,4 +1,6 @@
-from typing import List, Tuple
+from typing import List
+
+from .retrieval_result import RetrievalResult
 
 
 class BaseVectorStore:
@@ -8,14 +10,15 @@ class BaseVectorStore:
         self,
         texts: List[str],
         vectors: List[List[float]],
+        sources: List[str],
     ) -> None:
-        """Add texts and their vectors to the store."""
+        """Add texts, vectors and their sources to the store."""
         raise NotImplementedError
 
     def search(
         self,
         query_vector: List[float],
         top_k: int = 3,
-    ) -> List[Tuple[str, float]]:
-        """Return relevant texts and their similarity scores."""
+    ) -> List[RetrievalResult]:
+        """Return relevant results with text, score, and source."""
         raise NotImplementedError

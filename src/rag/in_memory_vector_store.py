@@ -2,6 +2,7 @@ from math import sqrt
 from typing import List, Tuple
 
 from .base_vector_store import BaseVectorStore
+from .retrieval_result import RetrievalResult
 
 
 class InMemoryVectorStore(BaseVectorStore):
@@ -10,50 +11,54 @@ class InMemoryVectorStore(BaseVectorStore):
     def __init__(self):
         self.texts: List[str] = []
         self.vectors: List[List[float]] = []
+        self.sources: List[str] = []
 
     def add(
         self,
         texts: List[str],
         vectors: List[List[float]],
+        sources: List[str],
     ) -> None:
-        """Add texts and their vectors to memory."""
+        """Add texts, vectors, and sources to memory."""
 
-        if len(texts) != len(vectors):
+        if len(texts) != len(vectors) or len(texts) != len(sources):
             raise ValueError(
-                "Texts and vectors must have the same length."
+                "Texts, vectors, and sources must have the same length."
             )
 
         self.texts.extend(texts)
         self.vectors.extend(vectors)
+        self.sources.extend(sources)
 
     def search(
         self,
         query_vector: List[float],
         top_k: int = 3,
-    ) -> List[Tuple[str, float]]:
-        """Return texts and cosine-similarity scores."""
+    ) -> List[RetrievalResult]:
+        """Return results sorted by cosine similarity."""
 
-        scored_results: List[Tuple[str, float]] = []
+        scored_results: List[Tuple[str, float, str]] = []
 
-        for text, vector in zip(
-            self.texts,
-            self.vectors,
+        for text, vector, source in zip(
+            self.texts, self.vectors, self.sources
         ):
             score = self._cosine_similarity(
                 query_vector,
                 vector,
             )
-
-            scored_results.append(
-                (text, score)
-            )
+            scored_results.append((text, score, source))
 
         scored_results.sort(
             key=lambda item: item[1],
             reverse=True,
         )
 
-        return scored_results[:top_k]
+        top_results = scored_results[:top_k]
+
+        return [
+            RetrievalResult(text=text, score=score, source=source)
+            for text, score, source in top_results
+        ]
 
     def _cosine_similarity(
         self,
