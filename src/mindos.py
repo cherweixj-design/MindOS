@@ -36,6 +36,7 @@ class MindOS:
         history = self.memory.get()
 
         # 1. Query Rewriting
+        rewrite_failed = False
         search_question = question
         if self.rewriter is not None:
             try:
@@ -45,6 +46,13 @@ class MindOS:
                 )
             except QueryRewriteError:
                 search_question = question
+                rewrite_failed = True
+
+            if self.debug:
+                if rewrite_failed:
+                    print("[DEBUG] 问题改写失败，已使用原始问题检索。")
+                print(f"[DEBUG] 原始问题：{question}")
+                print(f"[DEBUG] 检索问题：{search_question}")
 
         # 2. 用改写问题检索
         retrieval_results = self.retriever.search(

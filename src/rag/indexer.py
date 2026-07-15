@@ -18,12 +18,14 @@ class Indexer:
         embedding: BaseEmbedding,
         vector_store: BaseVectorStore,
         cache: Optional[KnowledgeCache] = None,
+        debug: bool = False,
     ):
         self.loader = loader
         self.splitter = splitter
         self.embedding = embedding
         self.vector_store = vector_store
         self.cache = cache
+        self.debug = debug
 
     def index(self, file_path: str) -> None:
         """Load, split, embed, and store a document."""
@@ -53,12 +55,17 @@ class Indexer:
         if self.cache is not None:
             cached = self.cache.load_if_valid(directory_path)
             if cached is not None:
+                if self.debug:
+                    print("[DEBUG] 知识索引缓存：命中。")
                 self.vector_store.add(
                     texts=cached.texts,
                     vectors=cached.vectors,
                     sources=cached.sources,
                 )
                 return cached.indexed_file_count
+
+            if self.debug:
+                print("[DEBUG] 知识索引缓存：未命中，正在重新构建。")
 
         md_files = sorted(path.glob("*.md"))
 

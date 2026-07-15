@@ -32,6 +32,7 @@ def build_mindos() -> MindOS:
         embedding=embedding,
         vector_store=vector_store,
         cache=cache,
+        debug=Settings.DEBUG,
     )
 
     indexed_count = indexer.index_directory("knowledge")
