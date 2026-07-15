@@ -3,6 +3,7 @@ from src.llm.deepseek import DeepSeekLLM
 from src.memory.memory import Memory
 from src.mindos import MindOS
 from src.prompt.prompt_builder import PromptBuilder
+from src.query.llm_query_rewriter import LLMQueryRewriter
 from src.rag.indexer import Indexer
 from src.rag.in_memory_vector_store import InMemoryVectorStore
 from src.rag.knowledge_cache import KnowledgeCache
@@ -45,6 +46,7 @@ def build_mindos() -> MindOS:
     )
 
     llm = DeepSeekLLM()
+    rewriter = LLMQueryRewriter(llm=llm)
     memory = Memory()
     prompt_builder = PromptBuilder()
 
@@ -55,6 +57,7 @@ def build_mindos() -> MindOS:
         prompt_builder=prompt_builder,
         top_k=2,
         debug=Settings.DEBUG,
+        rewriter=rewriter,
     )
 
 

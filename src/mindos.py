@@ -1,8 +1,9 @@
-from typing import List
+from typing import List, Optional
 
 from src.llm.base import BaseLLM
 from src.memory.memory import Memory
 from src.prompt.prompt_builder import PromptBuilder
+from src.query.base_query_rewriter import BaseQueryRewriter, QueryRewriteError
 from src.rag.base_retriever import BaseRetriever
 from src.rag.retrieval_result import RetrievalResult
 
@@ -18,6 +19,7 @@ class MindOS:
         prompt_builder: PromptBuilder,
         top_k: int = 3,
         debug: bool = False,
+        rewriter: Optional[BaseQueryRewriter] = None,
     ):
         self.llm = llm
         self.memory = memory
@@ -25,39 +27,54 @@ class MindOS:
         self.prompt_builder = prompt_builder
         self.top_k = top_k
         self.debug = debug
+        self.rewriter = rewriter
 
     def chat(self, question: str) -> str:
         """Answer a user question with retrieved knowledge."""
 
-        # 1. 检索知识
+        # 0. 读取当前历史（rewriter 需要）
+        history = self.memory.get()
+
+        # 1. Query Rewriting
+        search_question = question
+        if self.rewriter is not None:
+            try:
+                search_question = self.rewriter.rewrite(
+                    question=question,
+                    history=list(history),
+                )
+            except QueryRewriteError:
+                search_question = question
+
+        # 2. 用改写问题检索
         retrieval_results = self.retriever.search(
-            question=question,
+            question=search_question,
             top_k=self.top_k,
         )
 
-        # 2. Debug 模式下显示文本、相似度和来源
+        # 3. Debug 模式下显示文本、相似度和来源
         if self.debug:
             self._show_retrieval_results(
                 retrieval_results
             )
 
-        # 3. 提取知识文本給 PromptBuilder
+        # 4. 提取知识文本給 PromptBuilder
         knowledge = [
             result.text
             for result in retrieval_results
         ]
 
-        # 4. 组合提示词、知识、历史和当前问题
+        # 5. 组合提示词、知识、历史和当前问题（原始问题）
         messages = self.prompt_builder.build(
-            history=self.memory.get(),
+            history=history,
             knowledge=knowledge,
             question=question,
         )
 
-        # 5. 调用大模型
+        # 6. 调用大模型
         answer = self.llm.chat(messages)
 
-        # 6. 有检索结果时追加真实来源（去重、保持首次出现顺序）
+        # 7. 有检索结果时追加真实来源（去重、保持首次出现顺序）
         if retrieval_results:
             seen_sources: List[str] = []
             for result in retrieval_results:
@@ -65,7 +82,7 @@ class MindOS:
                     seen_sources.append(result.source)
             answer += f"\n\n来源：{'、'.join(seen_sources)}"
 
-        # 7. 保存当前会话历史
+        # 8. 保存当前会话历史（原始问题）
         self.memory.add("user", question)
         self.memory.add("assistant", answer)
 
