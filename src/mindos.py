@@ -72,7 +72,8 @@ class MindOS:
         )
 
         # 6. 调用大模型
-        answer = self.llm.chat(messages)
+        llm_answer = self.llm.chat(messages)
+        final_answer = llm_answer
 
         # 7. 有检索结果时追加真实来源（去重、保持首次出现顺序）
         if retrieval_results:
@@ -80,13 +81,13 @@ class MindOS:
             for result in retrieval_results:
                 if result.source not in seen_sources:
                     seen_sources.append(result.source)
-            answer += f"\n\n来源：{'、'.join(seen_sources)}"
+            final_answer += f"\n\n来源：{'、'.join(seen_sources)}"
 
         # 8. 保存当前会话历史（原始问题）
         self.memory.add("user", question)
-        self.memory.add("assistant", answer)
+        self.memory.add("assistant", llm_answer)
 
-        return answer
+        return final_answer
 
     def _show_retrieval_results(
         self,

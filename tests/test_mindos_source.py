@@ -143,3 +143,68 @@ class TestMindosAnswerSource:
         assert "来源：" in answer
         assert "employee.md" in answer
         assert "attendance.md" in answer
+
+
+class TestMindosMemorySource:
+    """Tests that Memory does not store programmatically appended sources."""
+
+    def test_return_value_still_contains_source(self):
+        retriever = FakeRetriever([_Result("年假政策", 0.9, "employee.md")])
+        mindos = make_mindos(retriever, "年假有15天。")
+        answer = mindos.chat("年假多少天？")
+        assert "来源：" in answer
+        assert "employee.md" in answer
+
+    def test_memory_assistant_has_no_source(self):
+        memory = Memory()
+        retriever = FakeRetriever([_Result("年假政策", 0.9, "employee.md")])
+        mindos = MindOS(
+            llm=FakeLLM("年假有15天。"),
+            memory=memory,
+            retriever=retriever,
+            prompt_builder=PromptBuilder(),
+            top_k=5,
+        )
+        mindos.chat("年假多少天？")
+        messages = memory.get()
+        assistant_msgs = [m for m in messages if m["role"] == "assistant"]
+        assert len(assistant_msgs) == 1
+        assert "来源：" not in assistant_msgs[0]["content"]
+
+    def test_memory_user_message_is_original(self):
+        memory = Memory()
+        retriever = FakeRetriever([_Result("年假政策", 0.9, "employee.md")])
+        mindos = MindOS(
+            llm=FakeLLM("年假有15天。"),
+            memory=memory,
+            retriever=retriever,
+            prompt_builder=PromptBuilder(),
+            top_k=5,
+        )
+        mindos.chat("年假多少天？")
+        messages = memory.get()
+        user_msgs = [m for m in messages if m["role"] == "user"]
+        assert len(user_msgs) == 1
+        assert user_msgs[0]["content"] == "年假多少天？"
+
+    def test_return_value_dedup_multi_source(self):
+        retriever = FakeRetriever([
+            _Result("年假天数", 0.9, "employee.md"),
+            _Result("年假结转", 0.8, "employee.md"),
+        ])
+        mindos = make_mindos(retriever, "年假规定。")
+        answer = mindos.chat("年假？")
+        assert "来源：" in answer
+        assert answer.count("employee.md") == 1
+
+    def test_return_value_ordered_dedup(self):
+        retriever = FakeRetriever([
+            _Result("年假政策", 0.9, "employee.md"),
+            _Result("病假政策", 0.8, "sick.md"),
+        ])
+        mindos = make_mindos(retriever, "制度说明。")
+        answer = mindos.chat("制度？")
+        assert "来源：" in answer
+        employee_pos = answer.index("employee.md")
+        sick_pos = answer.index("sick.md")
+        assert employee_pos < sick_pos
