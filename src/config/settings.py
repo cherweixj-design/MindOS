@@ -51,3 +51,10 @@ class Settings:
     EMBEDDING_API_KEY = os.getenv(
         "SILICONFLOW_API_KEY"
     )
+
+    MEMORY_MAX_TURNS = int(
+        os.getenv(
+            "MEMORY_MAX_TURNS",
+            "10",
+        )
+    )

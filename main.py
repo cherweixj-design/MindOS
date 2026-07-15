@@ -47,7 +47,9 @@ def build_mindos() -> MindOS:
 
     llm = DeepSeekLLM()
     rewriter = LLMQueryRewriter(llm=llm)
-    memory = Memory()
+    memory = Memory(
+        max_turns=Settings.MEMORY_MAX_TURNS,
+    )
     prompt_builder = PromptBuilder()
 
     return MindOS(
